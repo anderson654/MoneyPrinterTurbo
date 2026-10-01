@@ -53,9 +53,9 @@ class VideoFitMode(str, Enum):
     contain = "contain"
 
 
-SubtitleDisplayMode = Literal["sentence", "word_by_word"]
+SubtitleDisplayMode = Literal["sentence", "word_by_word", "progressive"]
 SubtitleAnimation = Literal["none", "pop_spring"]
-_SUBTITLE_DISPLAY_MODES = ("sentence", "word_by_word")
+_SUBTITLE_DISPLAY_MODES = ("sentence", "word_by_word", "progressive")
 _SUBTITLE_ANIMATIONS = ("none", "pop_spring")
 
 

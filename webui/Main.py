@@ -7653,6 +7653,7 @@ def _render_subtitle_settings(panel, params):
             subtitle_display_modes = [
                 (tr("Sentence by Sentence"), "sentence"),
                 (tr("Single Word (Word by Word)"), "word_by_word"),
+                (tr("Progressive (Karaoke)"), "progressive"),
             ]
             saved_display_mode = config.ui.get(
                 "subtitle_display_mode",

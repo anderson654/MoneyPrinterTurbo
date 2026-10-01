@@ -1347,6 +1347,49 @@ class TestVoiceService(unittest.TestCase):
         self.assertIn("00:00:00,900 --> 00:00:01,200", subtitle_content)
         self.assertIn("正在", subtitle_content)
 
+    def test_create_subtitle_progressive_accumulates_spoken_words(self):
+        """Progressive captions grow on each cue and reset after punctuation."""
+        sub_maker = SimpleNamespace(
+            cues=[
+                SimpleNamespace(
+                    content="Deus",
+                    start=timedelta(seconds=0.0),
+                    end=timedelta(seconds=0.3),
+                ),
+                SimpleNamespace(
+                    content="continua",
+                    start=timedelta(seconds=0.3),
+                    end=timedelta(seconds=0.7),
+                ),
+                SimpleNamespace(
+                    content="trabalhando.",
+                    start=timedelta(seconds=0.7),
+                    end=timedelta(seconds=1.2),
+                ),
+                SimpleNamespace(
+                    content="Confie.",
+                    start=timedelta(seconds=1.3),
+                    end=timedelta(seconds=1.8),
+                ),
+            ]
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            subtitle_file = Path(tmp_dir) / "progressive.srt"
+            vs.create_subtitle(
+                sub_maker=sub_maker,
+                text="Deus continua trabalhando. Confie.",
+                subtitle_file=str(subtitle_file),
+                progressive=True,
+            )
+            subtitle_content = subtitle_file.read_text(encoding="utf-8")
+
+        self.assertIn("Deus\n", subtitle_content)
+        self.assertIn("Deus continua\n", subtitle_content)
+        self.assertIn("Deus continua trabalhando.\n", subtitle_content)
+        self.assertIn("Confie.\n", subtitle_content)
+        self.assertNotIn("trabalhando. Confie.", subtitle_content)
+
     def test_create_subtitle_word_level_falls_back_to_provider_granularity(self):
         """
         旧版 SubMaker 没有 cue 时，应保留语音服务返回的原始时间粒度。

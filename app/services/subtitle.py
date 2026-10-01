@@ -62,6 +62,7 @@ def create(
     audio_file,
     subtitle_file: str = "",
     word_level: bool = False,
+    progressive: bool = False,
     log_details: bool = True,
 ):
     if WhisperModel is None:
@@ -112,11 +113,26 @@ def create(
             recognized(segment.text, segment.start, segment.end)
             continue
 
-        if word_level:
+        if word_level or progressive:
+            progressive_text = ""
             for word in segment.words:
                 cleaned_word = word.word.strip()
                 if cleaned_word:
-                    recognized(cleaned_word, word.start, word.end)
+                    if progressive:
+                        separator = "" if not progressive_text or re.match(
+                            r"^[,.;:!?)]", cleaned_word
+                        ) else " "
+                        candidate = f"{progressive_text}{separator}{cleaned_word}".strip()
+                        progressive_text = (
+                            cleaned_word
+                            if progressive_text and len(candidate) > 52
+                            else candidate
+                        )
+                        recognized(progressive_text, word.start, word.end)
+                        if cleaned_word.rstrip().endswith(tuple(const.PUNCTUATIONS)):
+                            progressive_text = ""
+                    else:
+                        recognized(cleaned_word, word.start, word.end)
             continue
 
         words_idx = 0

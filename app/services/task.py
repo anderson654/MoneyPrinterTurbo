@@ -638,7 +638,9 @@ def generate_subtitle(task_id, params, video_script, sub_maker, audio_file):
         )
         return ""
 
-    is_word_level = getattr(params, "subtitle_display_mode", "sentence") == "word_by_word"
+    subtitle_display_mode = getattr(params, "subtitle_display_mode", "sentence")
+    is_word_level = subtitle_display_mode == "word_by_word"
+    is_progressive = subtitle_display_mode == "progressive"
 
     # A failed retry must never reuse captions from an earlier narration.
     with staged_subtitle_file(final_subtitle_path) as subtitle_path:
@@ -648,6 +650,7 @@ def generate_subtitle(task_id, params, video_script, sub_maker, audio_file):
                 sub_maker=sub_maker,
                 subtitle_file=subtitle_path,
                 word_level=is_word_level,
+                progressive=is_progressive,
             )
             if not os.path.exists(subtitle_path):
                 # Edge 字幕偶尔会因为时间轴与文案无法匹配而没有产出文件。这里不能
@@ -665,6 +668,7 @@ def generate_subtitle(task_id, params, video_script, sub_maker, audio_file):
                 audio_file=audio_file,
                 subtitle_file=subtitle_path,
                 word_level=is_word_level,
+                progressive=is_progressive,
             )
             if not subtitle.file_to_subtitles(subtitle_path):
                 logger.warning("whisper produced no usable subtitle cues")

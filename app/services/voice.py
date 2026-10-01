@@ -3413,11 +3413,83 @@ def _build_subtitle_items_from_legacy_submaker_words(sub_maker: SubMaker) -> lis
     return sub_items
 
 
+def _append_progressive_text(current_text: str, cue_text: str, max_chars: int = 52) -> str:
+    """Accumulate spoken text while keeping each caption near two portrait lines."""
+    cue_text = unescape(cue_text).strip()
+    if not cue_text:
+        return current_text
+
+    separator = "" if not current_text or re.match(r"^[,.;:!?)]", cue_text) else " "
+    candidate = f"{current_text}{separator}{cue_text}".strip()
+    if current_text and len(candidate) > max_chars:
+        return cue_text
+    return candidate
+
+
+def _build_progressive_subtitle_items_from_edge_cues(sub_maker: SubMaker) -> list[str]:
+    """Build karaoke-like captions that grow as each timed Edge cue is spoken."""
+    formatter = _build_subtitle_formatter()
+    cues = [cue for cue in sub_maker.cues if unescape(cue.content).strip()]
+    sub_items = []
+    current_text = ""
+
+    for index, cue in enumerate(cues):
+        cue_text = unescape(cue.content).strip()
+        current_text = _append_progressive_text(current_text, cue_text)
+        start_time = int(cue.start.total_seconds() * 10000000)
+        if index + 1 < len(cues):
+            end_time = int(cues[index + 1].start.total_seconds() * 10000000)
+        else:
+            end_time = int(cue.end.total_seconds() * 10000000)
+        sub_items.append(
+            formatter(
+                idx=index + 1,
+                start_time=start_time,
+                end_time=max(start_time, end_time),
+                sub_text=current_text,
+            )
+        )
+        if cue_text.rstrip().endswith((".", "!", "?", ";", ":", "…")):
+            current_text = ""
+
+    return sub_items
+
+
+def _build_progressive_subtitle_items_from_legacy_submaker(sub_maker: SubMaker) -> list[str]:
+    """Use the finest timing supplied by legacy TTS providers for progressive captions."""
+    formatter = _build_subtitle_formatter()
+    entries = [
+        (offset, unescape(sub).strip())
+        for offset, sub in zip(
+            getattr(sub_maker, "offset", []), getattr(sub_maker, "subs", [])
+        )
+        if unescape(sub).strip()
+    ]
+    sub_items = []
+    current_text = ""
+    for index, (offset, cue_text) in enumerate(entries):
+        current_text = _append_progressive_text(current_text, cue_text)
+        start_time, original_end = offset
+        end_time = entries[index + 1][0][0] if index + 1 < len(entries) else original_end
+        sub_items.append(
+            formatter(
+                idx=index + 1,
+                start_time=start_time,
+                end_time=max(start_time, end_time),
+                sub_text=current_text,
+            )
+        )
+        if cue_text.rstrip().endswith((".", "!", "?", ";", ":", "…")):
+            current_text = ""
+    return sub_items
+
+
 def create_subtitle(
     sub_maker: SubMaker,
     text: str,
     subtitle_file: str,
     word_level: bool = False,
+    progressive: bool = False,
 ):
     """
     优化字幕文件
@@ -3428,6 +3500,15 @@ def create_subtitle(
     """
     text = _format_text(text)
     try:
+        if progressive:
+            if hasattr(sub_maker, "cues") and sub_maker.cues:
+                sub_items = _build_progressive_subtitle_items_from_edge_cues(sub_maker)
+            else:
+                sub_items = _build_progressive_subtitle_items_from_legacy_submaker(sub_maker)
+            if sub_items:
+                _write_subtitle_items(sub_items, subtitle_file)
+                return
+
         if word_level:
             if hasattr(sub_maker, "cues") and sub_maker.cues:
                 sub_items = _build_subtitle_items_from_edge_cues_words(sub_maker)
